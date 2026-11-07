@@ -64,6 +64,8 @@ No `input_*` helper: the scene cycle reads state that already exists. The YAML w
 
 ## Ideas not built: smoother dimming
 
+Planned for 1.1.0, tracked in [issue 1](https://github.com/OliEder/aqara-h2-blueprint/issues/1). The first version was kept as it is because it works.
+
 With the defaults, dimming sends 10 % every second, and the light jumps from step to step. Setting a smaller step and a shorter interval (for example 5 % every 0.5 s) is a configuration change and was the first thing tried. Three further ways, none built or tried:
 
 1. **Fade each step.** Send `transition` equal to the interval with every step, so that the light ramps to the next value. Risk: Home Assistant computes `brightness_step_pct` from the brightness the light **last reported**. If the light reports only at the end of the fade, the next step is computed from a stale value and the dimming can stutter. This can be judged only on the real light.

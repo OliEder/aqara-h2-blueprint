@@ -78,7 +78,7 @@ Examples A and B together; in "Actions: left, down" set "Single press" to a "Tog
 - **Two releases during one slow light call:** the dimming wait looks at the latest event of the switch only. If two rockers are held, and BOTH releases arrive while one light call is still running (the call must be slower than the roughly 0.2 s between the two events), the loop of the first release never sees its own release and dims until the safety limit (default 15 s). Narrow, but reproduced in a test. Options for a fix are in [docs/design.md](docs/design.md#known-limit-two-releases-during-one-slow-light-call).
 - **Brightness limits:** each step sends `brightness_step_pct`; what a light does at the minimum or maximum is up to the light. Not checked on a real light.
 - **Timers:** steps are timed by Home Assistant; very short intervals (0.1 s) depend on how fast your light answers.
-- **Smoothness of dimming:** with the defaults (10 % every second) the light visibly jumps from step to step. On the maintainer's ceiling light, 5 % every 0.5 s was set and looked better (a judgement by eye, not measured). A fading mode (`transition` per step) and the light's own move command are not built; see [docs/design.md](docs/design.md#ideas-not-built-smoother-dimming).
+- **Smoothness of dimming:** with the defaults (10 % every second) the light visibly jumps from step to step. On the maintainer's ceiling light, 5 % every 0.5 s was set and looked better (a judgement by eye, not measured). A fading mode (`transition` per step) and the light's own move command are not built; they are planned for 1.1.0 ([issue 1](https://github.com/OliEder/aqara-h2-blueprint/issues/1)); see [docs/design.md](docs/design.md#ideas-not-built-smoother-dimming).
 
 ## What was verified and what was not
 
