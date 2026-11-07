@@ -246,6 +246,87 @@ blueprint:
               max: 120
               unit_of_measurement: s
 
+        dim_fade:
+          name: Smooth fade
+          description: >-
+            When on, every dimming step also sends a transition as long as the interval, so the light ramps
+            instead of jumping. Risk: the next step is computed from the last REPORTED brightness; a light that
+            reports its brightness only after the fade can make the dimming stutter. Not tried on a real light.
+          default: false
+          selector:
+            boolean:
+
+    # --- Optional: a double press switches which light set the hold dims (state kept in one input_select). ---
+    section_dim_target:
+      name: Dimming target (switchable)
+      description: >-
+        Off by default. With a helper, a double press on a chosen button switches the dimming target to the next
+        one; the new target blinks. After a while without any press the target falls back to the first one
+        (default target), with a blink of the target that is left and then of the default. Needs an
+        `input_select` helper whose options are listed in the order of the three targets below. Slot 1 is the
+        default target; if it is empty, the light chosen under "Light to dim" is slot 1.
+      icon: mdi:swap-horizontal
+      collapsed: true
+      input:
+        dim_target_helper:
+          name: Helper that holds the current target
+          description: >-
+            An `input_select` helper. Its 1st option stands for target 1, the 2nd for target 2, the 3rd for
+            target 3. Leave empty to turn the feature off.
+          default: ""
+          selector:
+            entity:
+              domain: input_select
+        dim_switch_positions:
+          name: Double press switches the target
+          description: A double press on one of these buttons switches to the next target. Empty means no button.
+          default: []
+          selector:
+            select:
+              multiple: true
+              options: *positions
+        dim_target_1:
+          name: Target 1 (default target)
+          description: Lights, areas, devices or labels dimmed in slot 1. If empty, "Light to dim" is used.
+          default: {}
+          selector:
+            target:
+              entity:
+                domain: light
+        dim_target_2:
+          name: Target 2
+          description: Lights, areas, devices or labels dimmed in slot 2. An empty slot is skipped.
+          default: {}
+          selector:
+            target:
+              entity:
+                domain: light
+        dim_target_3:
+          name: Target 3
+          description: Lights, areas, devices or labels dimmed in slot 3. An empty slot is skipped.
+          default: {}
+          selector:
+            target:
+              entity:
+                domain: light
+        dim_target_timeout:
+          name: Fall back after
+          description: Seconds without any press of the switch after which the default target is used again.
+          default: 8
+          selector:
+            number:
+              min: 2
+              max: 60
+              unit_of_measurement: s
+        dim_target_blink:
+          name: Blink the target
+          description: >-
+            Blink the lights of a target when it is selected or left (the light's `flash: short`). Lights
+            without flash support will not blink. Not tried on a real light.
+          default: true
+          selector:
+            boolean:
+
     # --- Built-in scene cycle on a double press. ---
     section_scenes:
       name: Scene cycle (double press)
@@ -281,11 +362,24 @@ blueprint:
 # The first press after a restart comes from `unknown` and must work, so `unknown` is NOT excluded as old state.
 triggers:
   - trigger: state
+    id: switch
     entity_id: !input switch_entity
     not_from: unavailable
     not_to:
       - unavailable
       - unknown
+  # Home Assistant started: a switched dimming target is put back to the default (the watchers that would do
+  # it are lost at a restart). No blink. This trigger only EXISTS when a helper is configured (`enabled`),
+  # so a setup without the helper has exactly one trigger and no extra run after a restart, as in 1.0.0.
+  - trigger: homeassistant
+    id: ha_start
+    event: start
+    enabled: "{{ helper_configured | length > 0 }}"
+
+# Values for the `enabled` template of the trigger above (it is evaluated once when the automation loads and
+# may only use these variables, not states).
+trigger_variables:
+  helper_configured: !input dim_target_helper
 
 # `parallel` is needed: a hold keeps one run busy while its release starts another one.
 # `max: 10` caps the runs at the same time; further triggers are dropped with a log warning.
@@ -303,12 +397,56 @@ variables:
   dim_max_seconds: !input dim_max_seconds
   scenes: !input scenes
   scene_positions: !input scene_positions
+  dim_fade: !input dim_fade
+  dim_target_helper: !input dim_target_helper
+  dim_switch_positions: !input dim_switch_positions
+  dim_target_1: !input dim_target_1
+  dim_target_2: !input dim_target_2
+  dim_target_3: !input dim_target_3
+  dim_target_timeout: !input dim_target_timeout
+  dim_target_blink: !input dim_target_blink
   # What the switch just sent, e.g. "hold_left_down", split into gesture "hold" and position "left_down".
-  event_type: "{{ trigger.to_state.attributes.event_type | default('', true) }}"
+  # (the Home Assistant start trigger has no press, so its event type is empty)
+  event_type: "{{ trigger.to_state.attributes.event_type | default('', true) if trigger.id == 'switch' else '' }}"
   gesture: "{{ event_type.split('_', 1)[0] }}"
   position: "{{ event_type.split('_', 1)[1] if '_' in event_type else '' }}"
+  # The three dimming targets. Slot 1 is target 1, or the old "Light to dim" when target 1 is empty.
+  slots: >-
+    {% set first = dim_target_1 if dim_target_1 else ({'entity_id': dim_light} if dim_light else {}) %}
+    {{ [first, dim_target_2, dim_target_3] }}
+  # The options of the helper; option number i belongs to slot i.
+  helper_options: "{{ (state_attr(dim_target_helper, 'options') or []) if dim_target_helper else [] }}"
+  # The current slot (0, 1 or 2), read once when this run starts. A helper state that is not one of its
+  # options, an option beyond the third, or an empty slot all count as slot 1 (index 0).
+  slot_index: >-
+    {% set o = helper_options %}
+    {% set s = states(dim_target_helper) if dim_target_helper else '' %}
+    {{ o.index(s) if s in o and o.index(s) < 3 and slots[o.index(s)] else 0 }}
+  # What a hold dims: the target of the current slot.
+  hold_target: "{{ slots[slot_index] }}"
+  # The numbers of the slots that are filled, and the slot a double press would switch to.
+  filled: >-
+    {% set ns = namespace(l=[]) %}
+    {% for t in slots %}{% if t %}{% set ns.l = ns.l + [loop.index0] %}{% endif %}{% endfor %}
+    {{ ns.l }}
+  next_slot: >-
+    {% set l = filled %}
+    {{ l[(l.index(slot_index) + 1) % (l | length)] if slot_index in l else 0 }}
 
 actions:
+  # Part 0: after a Home Assistant start put a switched dimming target back to the default (no blink).
+  - if:
+      - condition: template
+        value_template: >-
+          {{ trigger.id == 'ha_start' and dim_target_helper | length > 0 and helper_options | length > 0
+             and states(dim_target_helper) != helper_options[0] }}
+    then:
+      - action: input_select.select_option
+        target:
+          entity_id: "{{ dim_target_helper }}"
+        data:
+          option: "{{ helper_options[0] }}"
+
   # Part 1: the user's own actions. Exactly one branch can match; an empty input does nothing.
   - choose:
       - conditions: "{{ event_type == 'single_left' }}"
@@ -353,19 +491,21 @@ actions:
         value_template: >-
           {{ gesture == 'hold'
              and (position in dim_up_positions or position in dim_down_positions)
-             and dim_light | length > 0 }}
+             and hold_target | length > 0 }}
     then:
       - variables:
           signed_step: "{{ dim_step if position in dim_up_positions else -dim_step }}"
+          # With the fade off the step data is exactly the brightness step; with it on a transition as long as the interval is added.
+          step_data: >-
+            {{ {'brightness_step_pct': signed_step, 'transition': dim_interval}
+               if dim_fade else {'brightness_step_pct': signed_step} }}
           release_event: "{{ 'release_' ~ position }}"
           started: "{{ as_timestamp(utcnow()) }}"
       - repeat:
           sequence:
             - action: light.turn_on
-              target:
-                entity_id: "{{ dim_light }}"
-              data:
-                brightness_step_pct: "{{ signed_step }}"
+              target: "{{ hold_target }}"
+              data: "{{ step_data }}"
             - wait_template: >-
                 {{ state_attr(switch, 'event_type') == release_event
                    or states(switch) in ['unavailable', 'unknown'] }}
@@ -399,3 +539,71 @@ actions:
       - action: scene.turn_on
         target:
           entity_id: "{{ scenes[(last_index | int + 1) % (scenes | length)] }}"
+
+  # Part 4: switch the dimming target. A double press on a chosen button selects the next filled slot in the
+  # helper, blinks the new target and then watches for inactivity. Needs the helper and at least two filled
+  # slots, one of them slot 1 (the default target), and an option in the helper for the next slot.
+  - if:
+      - condition: template
+        value_template: >-
+          {{ gesture == 'double' and position in dim_switch_positions and dim_target_helper | length > 0
+             and 0 in filled and filled | length >= 2 and helper_options | length > next_slot }}
+    then:
+      - action: input_select.select_option
+        target:
+          entity_id: "{{ dim_target_helper }}"
+        data:
+          option: "{{ helper_options[next_slot] }}"
+      - if:
+          - condition: template
+            value_template: "{{ dim_target_blink }}"
+        then:
+          - action: light.turn_on
+            target: "{{ slots[next_slot] }}"
+            data:
+              flash: short
+      # Inactivity watcher. Every press of the switch changes the event entity's state, so the time since
+      # its last change is the time without a press. Wait for the remaining time, again and again, until the
+      # whole timeout has passed. It occupies one of the parallel runs until then.
+      - repeat:
+          sequence:
+            - delay:
+                seconds: >-
+                  {{ [dim_target_timeout - (as_timestamp(utcnow()) - as_timestamp(expand(switch)[0].last_changed)), 0.5] | max }}
+          until:
+            - condition: template
+              value_template: >-
+                {{ as_timestamp(utcnow()) - as_timestamp(expand(switch)[0].last_changed) >= dim_target_timeout }}
+      # Fall back to the default target, if we are not on it. The slot is read FRESH here (the helper may have
+      # been changed by another watcher). The helper is set to the default FIRST, so a second watcher that ends
+      # now finds the default and does nothing: one confirmation sequence in total.
+      - variables:
+          now_slot: >-
+            {% set o = helper_options %}
+            {% set s = states(dim_target_helper) %}
+            {{ o.index(s) if s in o and o.index(s) < 3 and slots[o.index(s)] else 0 }}
+      - if:
+          - condition: template
+            value_template: "{{ now_slot != 0 }}"
+        then:
+          - variables:
+              leaving_target: "{{ slots[now_slot] }}"
+          - action: input_select.select_option
+            target:
+              entity_id: "{{ dim_target_helper }}"
+            data:
+              option: "{{ helper_options[0] }}"
+          - if:
+              - condition: template
+                value_template: "{{ dim_target_blink }}"
+            then:
+              - action: light.turn_on
+                target: "{{ leaving_target }}"
+                data:
+                  flash: short
+              - delay:
+                  seconds: 1.5
+              - action: light.turn_on
+                target: "{{ slots[0] }}"
+                data:
+                  flash: short

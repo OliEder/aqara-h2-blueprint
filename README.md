@@ -2,6 +2,8 @@
 
 This Home Assistant automation blueprint lets you configure every button press of an Aqara H2 double rocker wall switch that is connected through Zigbee2MQTT. For each button and gesture you can run any actions. Built in are dimming a light while a button is held, and cycling through a list of scenes with a double press.
 
+**New in 1.1.0 (both optional, off by default; see [CHANGELOG.md](CHANGELOG.md)):** a double press can switch which lights a hold dims (with a blink and an automatic fall-back), and the dimming can fade smoothly. With the new inputs left at their defaults the blueprint behaves exactly as 1.0.0.
+
 [![Open your Home Assistant instance and show the blueprint import dialog with this blueprint pre-filled.](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2FOliEder%2Faqara-h2-blueprint%2Fblob%2Fmain%2Fblueprints%2Fautomation%2Faqara_h2_switch.yaml)
 
 The button opens the import dialog of your own Home Assistant with this blueprint filled in. It works through My Home Assistant: you must have stored the address of your instance at [my.home-assistant.io](https://my.home-assistant.io) once (the data stays in your browser), and your Home Assistant must have the `my` integration, which is part of the default setup. The first time, My Home Assistant asks for that address. Without the button, follow the steps below.
@@ -10,7 +12,7 @@ The button opens the import dialog of your own Home Assistant with this blueprin
 
 | What | Detail |
 | --- | --- |
-| Home Assistant | 2024.10 or newer (`min_version: 2024.10.0`). How this was checked is in [docs/design.md](docs/design.md#minimum-version). |
+| Home Assistant | 2024.10 or newer (`min_version: 2024.10.0`; for the 1.1.0 features the exact minimum is not verified, see the design notes). How this was checked is in [docs/design.md](docs/design.md#minimum-version). |
 | Zigbee2MQTT | The switch must appear in Home Assistant as an `event` entity (for example `event.hall_h2_switch_action`). |
 | Switch mode | Observed on one device: both rockers were in **decoupled** operation mode (the relays do not switch by themselves) and **multi-click** was on for the lower buttons during all measurements. Both are device settings in Zigbee2MQTT, not in Home Assistant; find them in the device's page in the Zigbee2MQTT frontend (which tab holds them was not checked). The blueprint cannot set them. Assumed, not tested: without multi-click no double press is sent (it was never measured with multi-click off). |
 
@@ -48,6 +50,13 @@ Everything is optional except the switch entity.
 | | Step size | Percent per step | 10 | 5 |
 | | Interval | Seconds between steps | 1 | 0.5 |
 | | Safety limit | Seconds after which dimming stops even without a release | 15 | 20 |
+| | Smooth fade (new in 1.1.0) | When on, every dimming step also sends a transition as long as the interval | off | on |
+| Dimming target (switchable) (new in 1.1.0) | Helper that holds the current target | An `input_select` helper; option 1 is target 1, option 2 target 2, option 3 target 3. Empty turns the feature off. | empty | `input_select.hall_dim_target` |
+| | Double press switches the target | Buttons whose double press switches to the next target | none | `right_down` |
+| | Target 1 (default target) | Lights, areas, devices or labels. If empty, "Light to dim" is target 1 | empty | area `hall` |
+| | Target 2, Target 3 | More targets; an empty one is skipped | empty | `light.hall_strip` |
+| | Fall back after | Seconds without any press of the switch, then the default target is used again (2 to 60) | 8 | 8 |
+| | Blink the target | Blink the lights of a target when selected or left (`flash: short`) | on | on |
 | Scene cycle (double press) | Scenes | The scenes, in order | empty (cycle off) | `scene.hall_bright`, `scene.hall_evening`, `scene.hall_night` |
 | | Double press cycles scenes | Buttons whose double press activates the next scene | `right_down` | `right_down` |
 
@@ -60,6 +69,13 @@ Light to dim: `light.hall`. Hold dims up: left, down. Hold dims down: right, dow
 
 **B. Double press on the lower right button cycles three scenes.**
 Scenes: `scene.hall_bright`, `scene.hall_evening`, `scene.hall_night`. Double press cycles scenes: right, down (the default).
+
+**D. Switchable dimming target (new in 1.1.0).** The hold on the lower left button dims the hall ceiling spots; a double press on the lower right button switches to the hall strip, then to the two table lamps, then back to the spots. The new target blinks.
+1. Create a helper: Settings, Devices & services, Helpers, "Create helper", "Dropdown" (`input_select`). Name it `hall dim target` and give it three options in this order: `spots`, `strip`, `lamps`. The entity is `input_select.hall_dim_target`.
+2. In the blueprint: Dimming (hold): Hold dims up = left, down; Hold dims down = left (upper) or none; "Light to dim" may stay empty.
+3. Dimming target (switchable): helper `input_select.hall_dim_target`; Double press switches the target = right, down; Target 1 = the light `light.hall_spots`; Target 2 = the light `light.hall_strip`; Target 3 = `light.hall_lamp_a` and `light.hall_lamp_b`; Fall back after = 8 s; Blink = on.
+4. Use: double press the lower right button (the strip blinks), hold the lower left button (the strip dims). After 8 s without any press the strip blinks, then the spots blink, and the spots are the target again.
+A 1.0.0 setup that only has "Light to dim" keeps working: that light is target 1.
 
 **C. Both, plus your own action.**
 Examples A and B together; in "Actions: left, down" set "Single press" to a "Toggle" action on `light.hall`.
@@ -76,6 +92,7 @@ Examples A and B together; in "Actions: left, down" set "Single press" to a "Tog
 - **Parallel runs:** the automation allows 10 runs at the same time (`mode: parallel`, `max: 10`); further presses at that moment are dropped with a warning in the log. A hold uses one run until its release.
 - **Switch goes unavailable** during a hold: dimming ends at once. After the entity comes back with its old timestamp and event type, that old press is ignored, so it is not replayed. If Home Assistant restarts during a hold the run ends with it.
 - **Two releases during one slow light call:** the dimming wait looks at the latest event of the switch only. If two rockers are held, and BOTH releases arrive while one light call is still running (the call must be slower than the roughly 0.2 s between the two events), the loop of the first release never sees its own release and dims until the safety limit (default 15 s). Narrow, but reproduced in a test. Options for a fix are in [docs/design.md](docs/design.md#known-limit-two-releases-during-one-slow-light-call).
+- **Switchable target:** the state lives in the helper only. Each watcher that waits for the fall-back occupies one of the 10 parallel runs for up to the timeout; many quick double presses can fill them (further presses are dropped with a warning). A restart of Home Assistant loses running watchers, so the blueprint also puts the helper back to option 1 when Home Assistant has started (no blink). The activity that restarts the countdown is counted per switch entity, not across several switches. A helper with fewer options than filled targets cannot reach the extra targets. If you change the helper by hand while a watcher runs, the watcher finds the default (or another target) and acts on that.
 - **Brightness limits:** each step sends `brightness_step_pct`; what a light does at the minimum or maximum is up to the light. Not checked on a real light.
 - **Timers:** steps are timed by Home Assistant; very short intervals (0.1 s) depend on how fast your light answers.
 - **Smoothness of dimming:** with the defaults (10 % every second) the light visibly jumps from step to step. On the maintainer's ceiling light, 5 % every 0.5 s was set and looked better (a judgement by eye, not measured). A fading mode (`transition` per step) and the light's own move command are not built; they are planned for 1.1.0 ([issue 1](https://github.com/OliEder/aqara-h2-blueprint/issues/1)); see [docs/design.md](docs/design.md#ideas-not-built-smoother-dimming).
@@ -86,6 +103,7 @@ Examples A and B together; in "Actions: left, down" set "Single press" to a "Tog
 - The blueprint logic is tested in a throw-away Home Assistant with the test tool; see [docs/testing.md](docs/testing.md).
 - **Measured on the device and replayed in the tests:** a 10 s hold, two rockers held at the same time, a tap during a hold, double then single on the other rocker.
 - **Used on a real instance:** on 2026-11-07 the maintainer installed the blueprint on one Home Assistant instance, for one Aqara H2 double rocker through Zigbee2MQTT, with a ceiling light, a reading light and a closet light, a light strip (not reachable at that time), a blind and an "all lights" action, and reported that the buttons did what was configured. That was a manual check by one person; there is no recording of it, the automation traces of the last five single presses showed no errors, and the dimming runs were not looked at in detail.
+- **Not verified for 1.1.0:** the blink on a real light (the tests only show that the service is called with the right target and `flash: short`; lights without flash support will not blink), the smooth fade on a real light (risk: the next step is computed from the last reported brightness, so a light that reports only after the fade can stutter), and both features on a real Home Assistant instance. The tests use the real `input_select` component in a throw-away Home Assistant.
 - **Not tested:** the light strip (it was not reachable); dimming on other lights; running for weeks; holds longer than 10 s on the device; a Home Assistant restart in the middle of a hold; both releases arriving during a slow light call (known limit above, covered only by a simulated test); older Home Assistant versions than 2026.10.4 (`as_datetime` with a default, templated `wait_template` timeout).
 
 ## Run the tests
@@ -94,7 +112,7 @@ Examples A and B together; in "Actions: left, down" set "Single press" to a "Tog
 uv venv --python 3.14 .venv
 uv pip install --python .venv/bin/python -r requirements-dev.txt
 .venv/bin/python -m pytest
-# the mutation tool takes about 3 to 4 minutes and prints only at the end
+# the mutation tool took about 15 minutes for this blueprint (136 mutants x 132 tests, measured 14 to 15 minutes) and prints only at the end
 .venv/bin/python -m ha_blueprint_test_harness.mutate blueprints/automation/aqara_h2_switch.yaml --timeout 60 \
   -- .venv/bin/python -m pytest -q -x -p no:cacheprovider tests
 ```
