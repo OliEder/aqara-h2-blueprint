@@ -1,0 +1,3 @@
+# The test tool (the wheel of its release 0.1.0) and the Home Assistant test package it was tested with.
+ha-blueprint-test-harness @ https://github.com/OliEder/ha-blueprint-test-harness/releases/download/v0.1.0/ha_blueprint_test_harness-0.1.0-py3-none-any.whl
+pytest-homeassistant-custom-component==0.13.375

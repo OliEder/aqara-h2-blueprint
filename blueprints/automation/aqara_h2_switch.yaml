@@ -1,0 +1,399 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 Oliver-Marcus Eder. The licence text is in the file LICENSE of the repository this file comes from.
+#
+# Aqara H2 wall switch (double rocker) through Zigbee2MQTT.
+#
+# The switch shows up in Home Assistant as one `event` entity. Every press sets the attribute
+# `event_type` to <gesture>_<position>, for example `hold_left_down`.
+#   positions: left, left_down, right, right_down  (per the Zigbee2MQTT naming; "_down" is the lower button, inferred)
+#   gestures:  single, double, hold, release
+# A `hold` is expected to be followed by a `release` of the same position when the finger lifts. This is
+# not guaranteed (a radio message can be lost); the dimming has a safety limit for that case.
+#
+# This blueprint offers three things:
+#   1. For every position and gesture you can run any actions (16 optional inputs, grouped by button).
+#   2. Built-in dimming: while a hold lasts, a light is dimmed in steps; it stops at the matching release.
+#   3. Built-in scene cycle: a double press activates the next scene of a list (no helper needed).
+#
+# This file is maintained by hand. See docs/design.md for the reasons behind it.
+blueprint:
+  name: Aqara H2 wall switch (Zigbee2MQTT event entity)
+  description: >-
+    Configure every press of an Aqara H2 double rocker wall switch that is connected through
+    Zigbee2MQTT. Pick the switch's event entity, then fill in only what you need: your own actions for
+    any button and gesture, dimming a light while a button is held, and cycling through a list of scenes
+    with a double press. Dimming and the scene cycle run in addition to your own actions for the same press.
+    Needs Home Assistant 2024.10 or newer.
+  domain: automation
+  # Home Assistant 2024.10: the plural `triggers:` / `trigger:` syntax (2024.8 `action:`, 2024.6 sections are older).
+  homeassistant:
+    min_version: 2024.10.0
+  input:
+    switch_entity:
+      name: Switch event entity
+      description: >-
+        The `event` entity of the switch, usually named like `event.<room>_switch_action`
+        (for example `event.hall_h2_switch_action`).
+      selector:
+        entity:
+          domain: event
+
+
+    # --- Your own actions for the button "left". ---
+    section_left:
+      name: "Actions: left"
+      description: "Upper button of the left rocker (`left`, inferred from the Zigbee2MQTT naming). On the tested double rocker only a single press was seen sent by this button."
+      icon: mdi:light-switch
+      collapsed: true
+      input:
+        single_left:
+          name: "Single press on left"
+          description: "Actions to run on the event `single_left`. Leave empty to do nothing."
+          default: []
+          selector:
+            action:
+
+    # --- Your own actions for the button "right". ---
+    section_right:
+      name: "Actions: right"
+      description: "Upper button of the right rocker (`right`, inferred from the Zigbee2MQTT naming). On the tested double rocker only a single press was seen sent by this button."
+      icon: mdi:light-switch
+      collapsed: true
+      input:
+        single_right:
+          name: "Single press on right"
+          description: "Actions to run on the event `single_right`. Leave empty to do nothing."
+          default: []
+          selector:
+            action:
+
+    # --- Your own actions for the button "left_down". ---
+    section_left_down:
+      name: "Actions: left, down"
+      description: "Lower button of the left rocker (`left_down`, inferred from the Zigbee2MQTT naming). Sends single, double, hold and release on the tested double rocker."
+      icon: mdi:light-switch
+      collapsed: true
+      input:
+        single_left_down:
+          name: "Single press on left, down"
+          description: "Actions to run on the event `single_left_down`. Leave empty to do nothing."
+          default: []
+          selector:
+            action:
+        double_left_down:
+          name: "Double press on left, down"
+          description: "Actions to run on the event `double_left_down`. Leave empty to do nothing."
+          default: []
+          selector:
+            action:
+        hold_left_down:
+          name: "Hold on left, down"
+          description: "Actions to run on the event `hold_left_down`. Leave empty to do nothing."
+          default: []
+          selector:
+            action:
+        release_left_down:
+          name: "Release on left, down"
+          description: "Actions to run on the event `release_left_down`. Leave empty to do nothing."
+          default: []
+          selector:
+            action:
+
+    # --- Your own actions for the button "right_down". ---
+    section_right_down:
+      name: "Actions: right, down"
+      description: "Lower button of the right rocker (`right_down`, inferred from the Zigbee2MQTT naming). Sends single, double, hold and release on the tested double rocker."
+      icon: mdi:light-switch
+      collapsed: true
+      input:
+        single_right_down:
+          name: "Single press on right, down"
+          description: "Actions to run on the event `single_right_down`. Leave empty to do nothing."
+          default: []
+          selector:
+            action:
+        double_right_down:
+          name: "Double press on right, down"
+          description: "Actions to run on the event `double_right_down`. Leave empty to do nothing."
+          default: []
+          selector:
+            action:
+        hold_right_down:
+          name: "Hold on right, down"
+          description: "Actions to run on the event `hold_right_down`. Leave empty to do nothing."
+          default: []
+          selector:
+            action:
+        release_right_down:
+          name: "Release on right, down"
+          description: "Actions to run on the event `release_right_down`. Leave empty to do nothing."
+          default: []
+          selector:
+            action:
+
+    # --- Gestures that the tested double rocker was never seen to send. Kept for other Aqara models or firmware. ---
+    section_other_models:
+      name: "Actions: other models"
+      description: >-
+        Hold, double press and release of the UPPER buttons (`left`, `right`). Not seen sent by the tested
+        double rocker (observed on one device, not confirmed by the vendor); other models or firmware may send them.
+      icon: mdi:light-switch-off
+      collapsed: true
+      input:
+        hold_left:
+          name: "Hold on left"
+          description: "Actions to run on the event `hold_left`. Leave empty to do nothing."
+          default: []
+          selector:
+            action:
+        double_left:
+          name: "Double press on left"
+          description: "Actions to run on the event `double_left`. Leave empty to do nothing."
+          default: []
+          selector:
+            action:
+        release_left:
+          name: "Release on left"
+          description: "Actions to run on the event `release_left`. Leave empty to do nothing."
+          default: []
+          selector:
+            action:
+        hold_right:
+          name: "Hold on right"
+          description: "Actions to run on the event `hold_right`. Leave empty to do nothing."
+          default: []
+          selector:
+            action:
+        double_right:
+          name: "Double press on right"
+          description: "Actions to run on the event `double_right`. Leave empty to do nothing."
+          default: []
+          selector:
+            action:
+        release_right:
+          name: "Release on right"
+          description: "Actions to run on the event `release_right`. Leave empty to do nothing."
+          default: []
+          selector:
+            action:
+
+    # --- Built-in dimming of one light while a button is held. ---
+    section_dimming:
+      name: Dimming (hold)
+      description: >-
+        Holding a chosen button dims the light in steps until you let go. Defaults: hold the lower left
+        button to dim up, the lower right button to dim down. Nothing is dimmed until you pick a light.
+      icon: mdi:brightness-6
+      collapsed: true
+      input:
+        dim_light:
+          name: Light to dim
+          description: The light that is dimmed. Leave empty to turn dimming off.
+          default: ""
+          selector:
+            entity:
+              domain: light
+        dim_up_positions:
+          name: Hold dims up
+          description: Holding one of these buttons raises the brightness until you let go.
+          default: [left_down]
+          selector:
+            select:
+              multiple: true
+              options: &positions
+                - {value: left, label: "Left (upper)"}
+                - {value: left_down, label: "Left, down (lower)"}
+                - {value: right, label: "Right (upper)"}
+                - {value: right_down, label: "Right, down (lower)"}
+        dim_down_positions:
+          name: Hold dims down
+          description: Holding one of these buttons lowers the brightness until you let go. If a button is in both lists, dimming up wins.
+          default: [right_down]
+          selector:
+            select:
+              multiple: true
+              options: *positions
+        dim_step:
+          name: Step size
+          description: Brightness change per step, in percent.
+          default: 10
+          selector:
+            number:
+              min: 1
+              max: 50
+              unit_of_measurement: "%"
+        dim_interval:
+          name: Interval
+          description: Seconds between two steps while the finger stays down.
+          default: 1
+          selector:
+            number:
+              min: 0.1
+              max: 5
+              step: 0.1
+              unit_of_measurement: s
+        dim_max_seconds:
+          name: Safety limit
+          description: >-
+            Stops dimming after this many seconds even if no release arrives (for example when the radio
+            message is lost). Measured as real time since the hold started.
+          default: 15
+          selector:
+            number:
+              min: 1
+              max: 120
+              unit_of_measurement: s
+
+    # --- Built-in scene cycle on a double press. ---
+    section_scenes:
+      name: Scene cycle (double press)
+      description: >-
+        A double press on a chosen button activates the next scene of a list. Default: the lower right
+        button. Nothing happens until you pick scenes.
+      icon: mdi:palette
+      collapsed: true
+      input:
+        scenes:
+          name: Scenes
+          description: >-
+            The scenes to cycle through, in this order. The blueprint looks at which of them was
+            activated last and activates the next one; after the last it starts again at the first.
+            If none was activated yet, the first is used.
+          default: []
+          selector:
+            entity:
+              domain: scene
+              multiple: true
+        scene_positions:
+          name: Double press cycles scenes
+          description: A double press on one of these buttons activates the next scene.
+          default: [right_down]
+          selector:
+            select:
+              multiple: true
+              options: *positions
+
+# One trigger: any change of the event entity. The new event type is read from its attribute.
+# Going from `unavailable` is ignored: the entity comes back with its OLD timestamp and OLD event_type,
+# which would replay the last press. `unavailable` and `unknown` as the new state are no presses either.
+# The first press after a restart comes from `unknown` and must work, so `unknown` is NOT excluded as old state.
+triggers:
+  - trigger: state
+    entity_id: !input switch_entity
+    not_from: unavailable
+    not_to:
+      - unavailable
+      - unknown
+
+# `parallel` is needed: a hold keeps one run busy while its release starts another one.
+# `max: 10` caps the runs at the same time; further triggers are dropped with a log warning.
+mode: parallel
+max: 10
+
+# Inputs are copied into variables, because `!input` cannot be used inside a template.
+variables:
+  switch: !input switch_entity
+  dim_light: !input dim_light
+  dim_up_positions: !input dim_up_positions
+  dim_down_positions: !input dim_down_positions
+  dim_step: !input dim_step
+  dim_interval: !input dim_interval
+  dim_max_seconds: !input dim_max_seconds
+  scenes: !input scenes
+  scene_positions: !input scene_positions
+  # What the switch just sent, e.g. "hold_left_down", split into gesture "hold" and position "left_down".
+  event_type: "{{ trigger.to_state.attributes.event_type | default('', true) }}"
+  gesture: "{{ event_type.split('_', 1)[0] }}"
+  position: "{{ event_type.split('_', 1)[1] if '_' in event_type else '' }}"
+
+actions:
+  # Part 1: the user's own actions. Exactly one branch can match; an empty input does nothing.
+  - choose:
+      - conditions: "{{ event_type == 'single_left' }}"
+        sequence: !input single_left
+      - conditions: "{{ event_type == 'double_left' }}"
+        sequence: !input double_left
+      - conditions: "{{ event_type == 'hold_left' }}"
+        sequence: !input hold_left
+      - conditions: "{{ event_type == 'release_left' }}"
+        sequence: !input release_left
+      - conditions: "{{ event_type == 'single_left_down' }}"
+        sequence: !input single_left_down
+      - conditions: "{{ event_type == 'double_left_down' }}"
+        sequence: !input double_left_down
+      - conditions: "{{ event_type == 'hold_left_down' }}"
+        sequence: !input hold_left_down
+      - conditions: "{{ event_type == 'release_left_down' }}"
+        sequence: !input release_left_down
+      - conditions: "{{ event_type == 'single_right' }}"
+        sequence: !input single_right
+      - conditions: "{{ event_type == 'double_right' }}"
+        sequence: !input double_right
+      - conditions: "{{ event_type == 'hold_right' }}"
+        sequence: !input hold_right
+      - conditions: "{{ event_type == 'release_right' }}"
+        sequence: !input release_right
+      - conditions: "{{ event_type == 'single_right_down' }}"
+        sequence: !input single_right_down
+      - conditions: "{{ event_type == 'double_right_down' }}"
+        sequence: !input double_right_down
+      - conditions: "{{ event_type == 'hold_right_down' }}"
+        sequence: !input hold_right_down
+      - conditions: "{{ event_type == 'release_right_down' }}"
+        sequence: !input release_right_down
+
+  # Part 2: dimming. One step at once, then one step per interval while the finger stays down.
+  # It ends at the matching release, when the switch becomes unavailable or unknown, or at the
+  # safety limit. `wait_template` looks at the CURRENT state first, so a release that arrived while
+  # the light was still being set is not lost. Other presses of the switch do not wake the loop.
+  - if:
+      - condition: template
+        value_template: >-
+          {{ gesture == 'hold'
+             and (position in dim_up_positions or position in dim_down_positions)
+             and dim_light | length > 0 }}
+    then:
+      - variables:
+          signed_step: "{{ dim_step if position in dim_up_positions else -dim_step }}"
+          release_event: "{{ 'release_' ~ position }}"
+          started: "{{ as_timestamp(utcnow()) }}"
+      - repeat:
+          sequence:
+            - action: light.turn_on
+              target:
+                entity_id: "{{ dim_light }}"
+              data:
+                brightness_step_pct: "{{ signed_step }}"
+            - wait_template: >-
+                {{ state_attr(switch, 'event_type') == release_event
+                   or states(switch) in ['unavailable', 'unknown'] }}
+              timeout:
+                seconds: "{{ dim_interval }}"
+              continue_on_timeout: true
+          until:
+            - condition: template
+              value_template: >-
+                {{ wait.completed or as_timestamp(utcnow()) - started >= dim_max_seconds }}
+
+  # Part 3: scene cycle. The scene entity's state is the time it was last activated, so the scene
+  # with the newest time was the last one used; the next in the list comes after it. A state that is
+  # not a time (unknown, unavailable, text) counts as never activated. On equal times the earlier scene wins.
+  - if:
+      - condition: template
+        value_template: >-
+          {{ gesture == 'double' and position in scene_positions and scenes | length > 0 }}
+    then:
+      - variables:
+          last_index: >-
+            {% set ns = namespace(index=-1, newest=none) %}
+            {% for scene in scenes %}
+              {% set t = as_datetime(states(scene), none) %}
+              {% if t is not none and (ns.newest is none or t > ns.newest) %}
+                {% set ns.index = loop.index0 %}
+                {% set ns.newest = t %}
+              {% endif %}
+            {% endfor %}
+            {{ ns.index }}
+      - action: scene.turn_on
+        target:
+          entity_id: "{{ scenes[(last_index | int + 1) % (scenes | length)] }}"
