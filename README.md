@@ -2,6 +2,10 @@
 
 This Home Assistant automation blueprint lets you configure every button press of an Aqara H2 double rocker wall switch that is connected through Zigbee2MQTT. For each button and gesture you can run any actions. Built in are dimming a light while a button is held, and cycling through a list of scenes with a double press.
 
+[![Open your Home Assistant instance and show the blueprint import dialog with this blueprint pre-filled.](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2FOliEder%2Faqara-h2-blueprint%2Fblob%2Fmain%2Fblueprints%2Fautomation%2Faqara_h2_switch.yaml)
+
+The button opens the import dialog of your own Home Assistant with this blueprint filled in. It works through My Home Assistant: you must have stored the address of your instance at [my.home-assistant.io](https://my.home-assistant.io) once (the data stays in your browser), and your Home Assistant must have the `my` integration, which is part of the default setup. Without the button, follow the steps below.
+
 ## Requirements
 
 | What | Detail |
@@ -16,7 +20,7 @@ Zigbee2MQTT names four positions: `left`, `left_down`, `right`, `right_down`. We
 
 ## Import and set up, step by step
 
-1. In Home Assistant open Settings, Automations & Scenes, Blueprints, "Import Blueprint", and enter `https://github.com/OliEder/aqara-h2-blueprint/blob/main/blueprints/automation/aqara_h2_switch.yaml`. Home Assistant remembers the address, so a later "Re-import blueprint" picks up fixes. (Or copy the file into `config/blueprints/automation/`.)
+1. Click the button above, or in Home Assistant open Settings, Automations & Scenes, Blueprints, "Import Blueprint", and enter `https://github.com/OliEder/aqara-h2-blueprint/blob/main/blueprints/automation/aqara_h2_switch.yaml`. Home Assistant remembers the address, so a later "Re-import blueprint" picks up fixes. (Or copy the file into `config/blueprints/automation/`.)
 2. Click "Create automation" on the blueprint.
 3. Pick the event entity of your switch (an entity whose name ends in `_action` and whose domain is `event`). Do not pick a sensor or a device.
 4. Open the groups you need and fill in only those; everything else stays empty and does nothing.
