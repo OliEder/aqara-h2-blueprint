@@ -4,11 +4,7 @@ This Home Assistant automation blueprint lets you configure every button press o
 
 [![Open your Home Assistant instance and show the blueprint import dialog with this blueprint pre-filled.](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2FOliEder%2Faqara-h2-blueprint%2Fblob%2Fmain%2Fblueprints%2Fautomation%2Faqara_h2_switch.yaml)
 
-The button opens the import dialog of your own Home Assistant with this blueprint filled in. It works through My Home Assistant: you must have stored the address of your instance at [my.home-assistant.io](https://my.home-assistant.io) once (the data stays in your browser), and your Home Assistant must have the `my` integration, which is part of the default setup. The first time, My Home Assistant shows this page and asks for that address (screenshot of my.home-assistant.io, 2026-11-07, cropped):
-
-![My Home Assistant asks for the address of your instance the first time](docs/images/my-home-assistant-first-use.png)
-
-Without the button, follow the steps below.
+The button opens the import dialog of your own Home Assistant with this blueprint filled in. It works through My Home Assistant: you must have stored the address of your instance at [my.home-assistant.io](https://my.home-assistant.io) once (the data stays in your browser), and your Home Assistant must have the `my` integration, which is part of the default setup. The first time, My Home Assistant asks for that address. Without the button, follow the steps below.
 
 ## Requirements
 
@@ -26,6 +22,10 @@ Zigbee2MQTT names four positions: `left`, `left_down`, `right`, `right_down`. We
 
 1. Click the button above, or in Home Assistant open Settings, Automations & Scenes, Blueprints, "Import Blueprint", and enter `https://github.com/OliEder/aqara-h2-blueprint/blob/main/blueprints/automation/aqara_h2_switch.yaml`. Home Assistant remembers the address, so a later "Re-import blueprint" picks up fixes. (Or copy the file into `config/blueprints/automation/`.)
 2. Click "Create automation" on the blueprint.
+
+   ![The form for a new automation: the blueprint, its description and the option groups](docs/images/create-automation-form.png)
+
+   The form after "Create automation" (screenshot from 2026-11-07, German user interface, nothing selected yet): the blueprint, then one group of options per button, and the groups for dimming and the scene cycle.
 3. Pick the event entity of your switch (an entity whose name ends in `_action` and whose domain is `event`). Do not pick a sensor or a device.
 4. Open the groups you need and fill in only those; everything else stays empty and does nothing.
 5. Save. Press a button and look at the automation's trace to see what ran.
