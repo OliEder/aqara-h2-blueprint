@@ -22,7 +22,7 @@ Every test also fails if the automation logged a warning or error (`conftest.py`
 
 - Sub-second timing: timers can fire up to 0.5 s early, so only whole-second intervals are tested. The real 0.44 s hold is replayed as "release before the next step".
 - Real light behaviour (`brightness_step_pct` is accepted with any data, limits at 0 % and 100 %).
-- Real Zigbee2MQTT timing, the 0.2 s spacing of events, a Home Assistant restart during a hold, holds longer than 10 s, and a real running automation with a real light. (A 10 s hold and two held rockers were measured on the device and are replayed.)
+- Real Zigbee2MQTT timing, the 0.2 s spacing of events, a Home Assistant restart during a hold, holds longer than 10 s, and anything about a real light beyond the maintainer's manual check on 2026-11-07 (see the README). (A 10 s hold and two held rockers were measured on the device and are replayed.)
 - That the scene entity's state is a timestamp (assumed from Home Assistant's behaviour; the test effect sets it).
 - `as_datetime(value, default)` and the other templates on Home Assistant versions older than 2026.10.4.
 

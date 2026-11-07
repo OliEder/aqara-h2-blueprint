@@ -61,3 +61,12 @@ The highest of these is 2024.10. Not verified: the `as_datetime(value, default)`
 ## Why no helper, and why hand-maintained YAML
 
 No `input_*` helper: the scene cycle reads state that already exists. The YAML was first produced with a script; it is now maintained by hand and the script is not kept (it was not clean enough to be worth keeping).
+
+## Ideas not built: smoother dimming
+
+With the defaults, dimming sends 10 % every second, and the light jumps from step to step. Setting a smaller step and a shorter interval (for example 5 % every 0.5 s) is a configuration change and was the first thing tried. Three further ways, none built or tried:
+
+1. **Fade each step.** Send `transition` equal to the interval with every step, so that the light ramps to the next value. Risk: Home Assistant computes `brightness_step_pct` from the brightness the light **last reported**. If the light reports only at the end of the fade, the next step is computed from a stale value and the dimming can stutter. This can be judged only on the real light.
+2. **Let the light dim itself.** Zigbee2MQTT knows a `brightness_move` command (the light ramps until a `stop` arrives). It gives a smooth ramp with little radio traffic, but the blueprint would have to publish MQTT messages (a new input for the light's topic), and the test tool cannot simulate MQTT.
+3. **Smaller steps at a higher rate.** For example 3 % every 0.3 s. More radio traffic; whether the light and the mesh keep up was not checked.
+

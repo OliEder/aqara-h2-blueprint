@@ -25,6 +25,8 @@ blueprint:
     with a double press. Dimming and the scene cycle run in addition to your own actions for the same press.
     Needs Home Assistant 2024.10 or newer.
   domain: automation
+  author: OliEder
+  source_url: https://github.com/OliEder/aqara-h2-blueprint/blob/main/blueprints/automation/aqara_h2_switch.yaml
   # Home Assistant 2024.10: the plural `triggers:` / `trigger:` syntax (2024.8 `action:`, 2024.6 sections are older).
   homeassistant:
     min_version: 2024.10.0
