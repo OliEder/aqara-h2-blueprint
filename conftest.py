@@ -14,6 +14,7 @@ def expected_lingering_timers() -> bool:
 # Home Assistant logs a failing template or action of an automation as a warning or error and carries on,
 # so a test can pass while the blueprint is broken. After every test, fail it if the automation logged
 # (only the "call" phase of the test counts: caplog.records in teardown would be empty)
+# (this includes Home Assistant's template warnings, for example an index that does not exist)
 # anything at warning level or above, unless the test says it expects that (marker `allow_warnings`).
 @pytest.fixture(autouse=True)
 def no_automation_warnings(request, caplog):
@@ -21,5 +22,5 @@ def no_automation_warnings(request, caplog):
     if request.node.get_closest_marker("allow_warnings"):
         return
     bad = [r.getMessage() for r in caplog.get_records("call")
-           if r.name.startswith("homeassistant.components.automation") and r.levelname in ("WARNING", "ERROR", "CRITICAL")]
+           if r.name.startswith(("homeassistant.components.automation", "homeassistant.helpers.template")) and r.levelname in ("WARNING", "ERROR", "CRITICAL")]
     assert not bad, f"the automation logged problems: {bad}"

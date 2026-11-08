@@ -37,3 +37,47 @@ Run: `.venv/bin/python -m ha_blueprint_test_harness.mutate blueprints/automation
 - The one survivor, `M008` (`default('', true)` to `default('', false)` for `event_type`): it only matters when `event_type` is an empty string or null. Then no branch matches and no service runs, whichever default is used. It changes nothing a user can see (an extra log line at most). Accepted.
 
 Not mutated by the tool: numbers inside templates, the bodies of `choose` branches, list defaults. The default positions are covered by hand-written tests, not by mutants.
+
+# Version 1.1.0
+
+`tests/test_target.py` is new; the files of 1.0.0 are unchanged (their 82 tests pass unchanged and the strict xfail is still an xfail). The helper is the real `input_select` component, set up with `async_setup_component(env.hass, "input_select", {...})` before `start()`; it is changed like a user would with a real `input_select.select_option` call. The light and scene services are recorders, so a blink is only seen as a `light.turn_on` call with `flash: short` and the right target.
+
+## What is covered
+
+| Feature | Tests |
+| --- | --- |
+| Off equals 1.0.0 | the dimming step data is exactly `brightness_step_pct` and the light; a double press does nothing without a helper, and without switch positions |
+| Fade | with the fade on the step data has `transition` equal to the interval (also with a negative step and a switched target); off, no `transition` |
+| Switching | cycle 1, 2, 3, 1; an empty slot is skipped; fewer than two slots does nothing; no default slot does nothing; a helper with too few options stops at its last option; only a double press on a chosen button switches; own double actions and the scene cycle still run |
+| The helper's state | unknown text, a fourth option, and an unavailable helper all mean slot 1 for a hold |
+| The current target | a hold dims the target of the current slot (entity list, area, device, label, several areas); the legacy `dim_light` is slot 1; target 1 wins over it; the loop keeps its target when the helper changes during the hold, the next hold uses the new one |
+| Blink | new target blinks with `flash: short` and the right target; can be switched off |
+| Fall-back | leaving target blinks first and the default 1.5 s later (not at once); the timeout input and its default; every press restarts the countdown (also hold and release); nothing happens when already on the default; several quick switches give one confirmation sequence; works again after a fall-back; the switch going unavailable and unknown; a hold during the watch; the helper turning garbage, a fourth option, an empty slot or unavailable during the wait |
+| Restart and compatibility | the event `homeassistant_started` puts the helper back without a blink; a press still works after it; without a helper no run happens (`last_triggered` stays empty); with only the inputs of a 1.0.0 setup the start trigger adds no listener, with a helper it adds one |
+| Run limit | ten watchers fill the ten runs, the eleventh press is dropped |
+
+The log check of 1.0.0 now also fails a test on warnings of Home Assistant's template logger (for example an index that does not exist). It found a real problem during development: an empty helper default used with `!input` in a service target makes the whole blueprint invalid.
+
+## Timing
+
+Whole seconds, and only moments at least 0.5 s from a boundary. A watcher's first delay is the whole timeout; a press at t=5 moves the fall-back to 13 s, which is why those tests look at 10 s and 14 s. The 1.5 s between the two fall-back blinks is checked at 0.4 s after the first blink (not yet) and 2 s later (done).
+
+## What the harness cannot test (new in 1.1.0)
+
+- That a real light blinks (`flash`) or fades (`transition`) as intended, and the stutter risk of the fade.
+- A real restart with a real helper (the restart part is tested by firing `homeassistant_started`).
+- Two watchers ending in the very same instant on a real instance (the gap between a watcher's check and its change of the helper).
+
+## Mutation result (1.1.0)
+
+131 tests pass and 1 is the strict xfail. 136 loadable mutants. The run took about 14 to 15 minutes (measured by the clock: 23:58 to 00:12; an earlier estimate of 25 minutes was too high) and prints only at the end.
+
+- First run (before the review fixes): 126 killed, 9 survived, 93 %.
+- After 5 new tests (the helper changing while a watcher waits) and the template logger added to the log check: 130 killed, 5 survived, 96 %.
+- Last run, after the start-trigger fix (`enabled`) and its tests: **131 killed, 5 survived, 0 invalid, 96 %** of 136 mutants; the survivors are the same five (M016 = the old M015, M027, M028, M098, M117; the numbers moved by one because the trigger adds a mutant).
+- The 4 survivors that were closed: `now_slot` with `<=` instead of `<` (and `slot_index` the same), and two `and` to `or` changes. They showed that nothing tested the helper turning garbage, a fourth option or an empty slot during the wait.
+
+Remaining survivors, none a test gap I can close:
+- `M015` (now M016) `default('', true)` to `false` for `event_type`: same as in 1.0.0, no visible effect.
+- `M026`, `M027`, `M097` (the first `length > 0` of two redundant guards in the helper checks, mutated to `>= 0`): each guard is covered by the other one (with no helper the options list is empty too), so the changes alter nothing. The guard that is not redundant (`helper_options | length > next_slot`) is checked by hand: changing it to `>=` makes the test "a helper with too few options" fail.
+- `M116` (dropping the `delay` of the watcher): the loop then spins without waiting and still ends at the right moment, because the harness clock only moves when the test moves it. So the frozen clock cannot tell a waiting loop from a busy loop. A real instance would burn CPU in that case; it is not detectable with this harness.
