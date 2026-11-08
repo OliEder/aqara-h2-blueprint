@@ -1,0 +1,9 @@
+# Proposes updates of the GitHub Actions that the workflow uses. They are pinned to commit ids; Dependabot keeps the
+# version comment next to the id up to date. (The test tool and Home Assistant's test package are pinned in
+# requirements-dev.txt and moved by hand, see "Checks on every change" in the README.)
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly

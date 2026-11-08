@@ -28,13 +28,21 @@ Every test also fails if the automation logged a warning or error (`conftest.py`
 
 ## Mutation result
 
-Run: `.venv/bin/python -m ha_blueprint_test_harness.mutate blueprints/automation/aqara_h2_switch.yaml --timeout 60 -- .venv/bin/python -m pytest -q -x -p no:cacheprovider tests` (about 4 minutes, output only at the end).
+Run: `.venv/bin/python -m ha_blueprint_test_harness.mutate blueprints/automation/aqara_h2_switch.yaml --jobs 4 --timeout 180 -- .venv/bin/python -m pytest -q -x -p no:cacheprovider tests` (about 7 minutes for 1.1.0 with 4 jobs on an 8-core Mac; one line per mutant as it goes).
 
 82 tests pass and 1 is a strict xfail (the known limit). 72 loadable mutants.
 
 - First run of the reworked blueprint (75 to 77 tests, taken while I was still adding tests): 69 killed, 3 survived, 96 %.
 - Two of those survivors (`dim_light | length > 0` to `>= 0`, `scenes | length > 0` to `>= 0`) should have been killed by the log check, but the first version of the check read an empty log (see docs-friction.md). After the fix: **71 killed, 1 survived, 0 invalid, 99 %** (81 tests).
 - The one survivor, `M008` (`default('', true)` to `default('', false)` for `event_type`): it only matters when `event_type` is an empty string or null. Then no branch matches and no service runs, whichever default is used. It changes nothing a user can see (an extra log line at most). Accepted.
+
+**Version 1.1.0, measured on 2026-11-09 with harness 0.4.1: 136 mutants, 133 killed, 3 survived, 0 invalid, 97.79 %** (134 tests: 133 pass, 1 strict xfail). The first run of that day killed 131; two tests were added for the two survivors that were real gaps:
+
+- `M028` (`helper_options | length > 0` to `>= 0` in the start trigger): killed by `test_a_home_assistant_start_with_a_helper_that_does_not_exist_runs_quietly`.
+- `M117` (the pause of the inactivity watcher dropped, so its loop would check again and again): killed by `test_the_inactivity_watcher_waits_instead_of_checking_in_a_loop`, which reads the trace of the run.
+- The 3 survivors left: `M016` (`default('', true)`, accepted above as `M008`) and the two comparisons `dim_target_helper | length > 0` to `>= 0` (`M027` in the start trigger, `M098` in the switch branch). The helper id is empty only when its options list is empty, and the next condition (`helper_options | length > 0`, `helper_options | length > next_slot`) already rules that case out, so the change has no effect. Equivalent.
+
+The CI fails when the score drops below 97 %.
 
 Not mutated by the tool: numbers inside templates, the bodies of `choose` branches, list defaults. The default positions are covered by hand-written tests, not by mutants.
 

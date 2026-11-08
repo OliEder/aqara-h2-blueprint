@@ -112,10 +112,21 @@ Examples A and B together; in "Actions: left, down" set "Single press" to a "Tog
 uv venv --python 3.14 .venv
 uv pip install --python .venv/bin/python -r requirements-dev.txt
 .venv/bin/python -m pytest
-# the mutation tool took about 15 minutes for this blueprint (136 mutants x 132 tests, measured 14 to 15 minutes) and prints only at the end
-.venv/bin/python -m ha_blueprint_test_harness.mutate blueprints/automation/aqara_h2_switch.yaml --timeout 60 \
+# the mutation tool breaks the blueprint in 136 small ways and runs the tests for each: about 7 minutes with 4 jobs on an
+# 8-core Mac (about 15 minutes one after the other); it prints a line for each mutant as it goes
+.venv/bin/python -m ha_blueprint_test_harness.mutate blueprints/automation/aqara_h2_switch.yaml --jobs 4 --timeout 180 \
   -- .venv/bin/python -m pytest -q -x -p no:cacheprovider tests
 ```
+
+## Checks on every change
+
+`.github/workflows/ci.yaml` runs on every push to `main`, on every pull request and once a week:
+
+- **tests**: the tests with the pinned test tool and Home Assistant test package (`requirements-dev.txt`, locked with hashes in `requirements-dev.lock`). This is the reproducible check.
+- **mutation**: the mutation tool breaks the blueprint and fails if the tests stop noticing. The floor is 97 % (133 of 136 killed on 2026-11-09, the three survivors are explained in [docs/testing.md](docs/testing.md)).
+- **tests (latest harness release)**: the same tests with the newest release of the test tool instead of the pinned one. It is an early warning: when it fails while **tests** is green, a newer release needs a change here (or in the tool) before the pin is moved. The weekly run notices a new release even when nobody changes this repository.
+
+To move to a newer release of the test tool: put its wheel URL and the hash from its `SHA256SUMS` file into `requirements-dev.txt`, run `uv pip compile requirements-dev.txt --generate-hashes --python-platform x86_64-unknown-linux-gnu --python-version 3.14.3 -o requirements-dev.lock`, run the tests and the mutation tool, and commit both files. The actions in the workflow are pinned to commit ids; Dependabot proposes updates (check that the id belongs to the version in the comment).
 
 ## Maintenance, credits, licence
 

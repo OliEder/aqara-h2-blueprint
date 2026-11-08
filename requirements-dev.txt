@@ -1,3 +1,4 @@
-# The test tool (the wheel of its release 0.2.0) and the Home Assistant test package it was tested with.
-ha-blueprint-test-harness @ https://github.com/OliEder/ha-blueprint-test-harness/releases/download/v0.2.0/ha_blueprint_test_harness-0.2.0-py3-none-any.whl
+# The test tool (the wheel of its release 0.4.1, with the hash from the SHA256SUMS file of that release) and the Home
+# Assistant test package it was tested with. CI installs from requirements-dev.lock (generated from this file).
+ha-blueprint-test-harness @ https://github.com/OliEder/ha-blueprint-test-harness/releases/download/v0.4.1/ha_blueprint_test_harness-0.4.1-py3-none-any.whl#sha256=3397197e09ba3f5175e74a258ab24acec6738f835ef01e68d901f2bdd0ac93f8
 pytest-homeassistant==2026.11.0

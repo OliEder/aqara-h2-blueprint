@@ -1,0 +1,104 @@
+name: CI
+
+# Quality checks that run on every push to main and on every pull request, and once a week.
+#
+#   tests                   the tests of the blueprint, with the version of the test tool and of Home Assistant's
+#                           test package that this repository pins (requirements-dev.txt, locked with hashes in
+#                           requirements-dev.lock). This is the reproducible check.
+#   mutation                the mutation tool breaks the blueprint in small ways and fails if the tests stop noticing
+#                           (the floor is the score measured when it was set; see "Run the tests" in the README).
+#   tests-latest-harness    the same tests with the LATEST release of the test tool instead of the pinned one. It is an
+#                           early warning: when it fails while `tests` is green, a newer release of the tool needs a
+#                           change here (or in the tool) before the pin is moved. It also runs once a week, so a new
+#                           release is noticed even when nobody changes this repository.
+#
+# The actions are pinned to commit ids (the comment names the version; Dependabot proposes updates), the packages come
+# from the lock file with hashes, and no checkout keeps the token.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    - cron: "17 5 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.14"
+          cache: pip
+          cache-dependency-path: requirements-dev.lock
+
+      - name: Install dependencies
+        run: python -m pip install --require-hashes -r requirements-dev.lock
+
+      - name: Tests
+        run: python -m pytest -p no:cacheprovider -q
+
+  # The floor is the score measured on 2026-11-09 (133 of 136 mutants killed, 97.79 %), rounded DOWN. The three survivors
+  # are known (docs/testing.md); a lower score means a test got weaker or a change of the blueprint is not tested.
+  mutation:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.14"
+          cache: pip
+          cache-dependency-path: requirements-dev.lock
+
+      - name: Install dependencies
+        run: python -m pip install --require-hashes -r requirements-dev.lock
+
+      - name: Mutation run
+        env:
+          FLOOR: "97"
+        run: |
+          set +e
+          python -m ha_blueprint_test_harness.mutate blueprints/automation/aqara_h2_switch.yaml --jobs 4 --timeout 180 --fail-under "$FLOOR" -- \
+            python -m pytest -q -x -p no:cacheprovider tests | tee mutation.txt
+          status=${PIPESTATUS[0]}
+          { echo "### Mutation run: aqara_h2_switch.yaml (floor $FLOOR %)"; echo; echo '```'; tail -n 40 mutation.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+          exit "$status"
+
+  tests-latest-harness:
+    name: tests (latest harness release)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.14"
+
+      # The Home Assistant test package stays at the pinned version; only the test tool is replaced by its newest
+      # release, which is checked against the SHA256SUMS file of that release before it is installed.
+      - name: Install the test package and the latest release of the test tool
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          grep -E "^pytest-homeassistant==" requirements-dev.txt > requirements-latest.txt
+          python -m pip install -r requirements-latest.txt
+          gh release download --repo OliEder/ha-blueprint-test-harness --pattern '*.whl' --pattern SHA256SUMS --dir latest
+          (cd latest && sha256sum --check --ignore-missing SHA256SUMS)
+          python -m pip install --no-deps latest/*.whl
+          python -m pip list 2>/dev/null | grep -i "ha-blueprint-test-harness"
+
+      - name: Tests
+        run: python -m pytest -p no:cacheprovider -q
