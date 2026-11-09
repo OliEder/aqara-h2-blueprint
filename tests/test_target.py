@@ -524,3 +524,29 @@ async def test_the_fall_back_works_from_the_third_slot_too(blueprint_env):
         await blueprint_env.advance(3)
     assert option(blueprint_env) == "spots"
     assert blinks(blueprint_env)[-2:] == [LAMP, SPOTS]
+
+
+async def test_a_home_assistant_start_with_a_helper_that_does_not_exist_runs_quietly(blueprint_env):
+    # The helper is named in the blueprint but the entity does not exist, so there are no options to put it back to.
+    # The start trigger must do nothing (and log nothing: a failing template would fail the test through the log check).
+    await start(blueprint_env, **CYCLE)
+    await blueprint_env.fire_event("homeassistant_started")
+    assert blueprint_env.calls == []
+
+
+# The step of the inactivity watcher that waits (the delay inside the repeat of the double-press branch), and how often it ran.
+WATCHER_DELAY = "action/4/then/2/repeat/sequence/0"
+
+
+async def test_the_inactivity_watcher_waits_instead_of_checking_in_a_loop(blueprint_env):
+    # Without the pause the loop would run its check again and again while time stands still (or, on a real instance,
+    # keep a worker busy for the whole timeout). With it, the loop sleeps once for the remaining time.
+    await start_target(blueprint_env, **CYCLE)
+    await press(blueprint_env, "double_right_down")
+    for _ in range(3):
+        await blueprint_env.advance(1)
+    iterations = blueprint_env.last_trace().steps.get(WATCHER_DELAY, [])
+    assert len(iterations) == 1
+    await blueprint_env.advance(6)
+    assert option(blueprint_env) == "spots"
+    assert len(blueprint_env.last_trace().steps[WATCHER_DELAY]) <= 2
